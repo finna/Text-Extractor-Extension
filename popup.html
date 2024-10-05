@@ -8,7 +8,7 @@
       width: 300px;
       padding: 10px;
     }
-    #extract-button {
+    #extract-button, #save-button {
       margin-top: 10px;
     }
     #content {
@@ -22,9 +22,12 @@
   </style>
 </head>
 <body>
-  <h2>Text Extractor</h2>
-  <button id="extract-button">Extract Text</button>
+  <h2>Tweet Extractor</h2>
+  <button id="extract-button">Extract Tweet</button>
+  <button id="save-button" disabled>Save Tweet</button>
   <div id="content"></div>
+  <script src="supabase.js"></script>
+  <script>console.log('Supabase version:', supabase.version);</script>
   <script src="popup.js"></script>
 </body>
 </html>
