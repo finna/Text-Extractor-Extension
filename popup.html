@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Text Extractor</title>
+  <title>Tweet Extractor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -22,12 +22,12 @@
   </style>
 </head>
 <body>
-  <h2>Tweet Extractor</h2>
-  <button id="extract-button">Extract Tweet</button>
+  <h1>Tweet Extractor</h1>
+  <div id="statusMessage"></div>
+  <button id="authButton">Login</button>
+  <button id="extract-button" disabled>Extract Tweet</button>
   <button id="save-button" disabled>Save Tweet</button>
   <div id="content"></div>
-  <script src="supabase.js"></script>
-  <script>console.log('Supabase version:', supabase.version);</script>
   <script src="popup.js"></script>
 </body>
 </html>

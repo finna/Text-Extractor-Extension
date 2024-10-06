@@ -1,0 +1,1 @@
+console.log('Supabase version:', supabase.version);

@@ -3,11 +3,29 @@
     "name": "Tweet Extractor",
     "version": "1.0",
     "description": "Extract and save tweets",
-    "permissions": ["activeTab", "scripting"],
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://twitter.com/*",
+        "https://x.com/*",
+        "http://localhost:3000/*"
+    ],
     "action": {
-      "default_popup": "popup.html"
+        "default_popup": "popup.html"
     },
     "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'"
-    }
-  }
+        "extension_pages": "script-src 'self'; object-src 'self'"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://twitter.com/*", "https://x.com/*"],
+            "js": ["content.js"]
+        }
+    ]
+}
