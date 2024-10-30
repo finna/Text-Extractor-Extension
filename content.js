@@ -76,51 +76,54 @@ function extractTweetData(tweetElement) {
     };
 
     const getUsername = () => {
+        // Method 1: Try to get from User-Name element
         if (userElement) {
-            const usernameElement = userElement.querySelector('div[dir="ltr"] span:nth-child(2)');
-            return usernameElement ? usernameElement.textContent.trim().replace('@', '') : 'Not found';
-        }
-        return 'Not found';
-    };
-
-    const getViews = () => {
-        // Method 1: Look for a specific structure
-        const viewsContainer = tweetElement.querySelector('a[href$="/analytics"]');
-        if (viewsContainer) {
-            const viewsText = viewsContainer.textContent.trim();
-            const viewsMatch = viewsText.match(/(\d+(?:,\d+)*(?:\.\d+)?[KMB]?)\s*views?/i);
-            if (viewsMatch) return viewsMatch[1];
-        }
-
-        // Method 2: Look for elements with specific class combinations
-        const possibleViewsElements = tweetElement.querySelectorAll('span[class*="r-bcqeeo"][class*="r-qvutc0"][class*="r-1tl8opc"]');
-        for (const element of possibleViewsElements) {
-            if (/^\d+(?:,\d+)*(?:\.\d+)?[KMB]?$/.test(element.textContent.trim())) {
-                return element.textContent.trim();
-            }
-        }
-
-        // Method 3: Look for elements near the word "Views"
-        const viewsLabel = Array.from(tweetElement.querySelectorAll('span')).find(el => el.textContent.trim().toLowerCase() === 'views');
-        if (viewsLabel) {
-            const siblings = viewsLabel.parentElement.children;
-            for (const sibling of siblings) {
-                const text = sibling.textContent.trim();
-                if (/^\d+(?:,\d+)*(?:\.\d+)?[KMB]?$/.test(text)) {
-                    return text;
+            const spans = userElement.querySelectorAll('span');
+            for (const span of spans) {
+                const text = span.textContent.trim();
+                if (text.startsWith('@')) {
+                    return text.substring(1);
                 }
             }
         }
 
-        // Method 4: Search for a number followed by "Views" in the entire tweet
-        const tweetText = tweetElement.innerText;
-        const globalViewsMatch = tweetText.match(/(\d+(?:,\d+)*(?:\.\d+)?[KMB]?)\s*views?/i);
-        if (globalViewsMatch) return globalViewsMatch[1];
+        // Method 2: Try to get from tweet link
+        const tweetLink = tweetElement.querySelector('a[href*="/status/"]');
+        if (tweetLink) {
+            const href = tweetLink.getAttribute('href');
+            const match = href.match(/\/([^/]+)\/status\//);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
 
-        return '0';
+        return 'Not found';
+    };
+
+    const getViews = () => {
+        // Method 1: Try analytics link (for single tweet view)
+        const analyticsLink = tweetElement.querySelector('a[href$="/analytics"]');
+        if (analyticsLink) {
+            const viewsText = analyticsLink.textContent.trim();
+            const viewsMatch = viewsText.match(/(\d+(?:,\d+)*(?:\.\d+)?[KMB]?)\s*views?/i);
+            if (viewsMatch) return viewsMatch[1];
+        }
+
+        // Method 2: Try finding views in tweet metrics
+        const metrics = tweetElement.querySelectorAll('[role="group"] span');
+        for (const metric of metrics) {
+            const text = metric.textContent.trim();
+            if (text.toLowerCase().includes('view')) {
+                const viewCount = text.match(/(\d+(?:,\d+)*(?:\.\d+)?[KMB]?)/);
+                if (viewCount) return viewCount[1];
+            }
+        }
+
+        return 'Not found';
     };
 
     const getBookmarks = () => {
+        // Method 1: Try the standard bookmark button
         const bookmarkButton = tweetElement.querySelector('[data-testid="bookmark"]');
         if (bookmarkButton) {
             const countElement = bookmarkButton.querySelector('span[data-testid="app-text-transition-container"]');
@@ -129,18 +132,48 @@ function extractTweetData(tweetElement) {
             }
         }
         
-        // If the above method doesn't work, try an alternative approach
-        const allSpans = tweetElement.querySelectorAll('span');
-        for (const span of allSpans) {
-            if (span.textContent.trim().toLowerCase() === 'bookmarks') {
-                const nextSpan = span.nextElementSibling;
-                if (nextSpan && nextSpan.tagName === 'SPAN') {
-                    return nextSpan.textContent.trim();
+        // Method 2: Try finding bookmarks in tweet metrics
+        const metrics = tweetElement.querySelectorAll('[role="group"] span');
+        for (const metric of metrics) {
+            const text = metric.textContent.trim();
+            if (text.toLowerCase().includes('bookmark')) {
+                const nextSibling = metric.nextElementSibling;
+                if (nextSibling) {
+                    const bookmarkCount = nextSibling.textContent.match(/(\d+(?:,\d+)*(?:\.\d+)?[KMB]?)/);
+                    if (bookmarkCount) return bookmarkCount[1];
                 }
             }
         }
         
         return '0';
+    };
+
+    const getDate = () => {
+        // Method 1: Try finding time element directly
+        const timeElement = tweetElement.querySelector('time');
+        if (timeElement && timeElement.getAttribute('datetime')) {
+            return timeElement.getAttribute('datetime');
+        }
+
+        // Method 2: Try finding time in tweet metadata
+        const timeSpans = tweetElement.querySelectorAll('span');
+        for (const span of timeSpans) {
+            const text = span.textContent.trim();
+            if (text.match(/\d{1,2}:\d{2} [AP]M.*\d{4}/)) {
+                const parentTime = span.closest('time');
+                if (parentTime && parentTime.getAttribute('datetime')) {
+                    return parentTime.getAttribute('datetime');
+                }
+            }
+        }
+
+        return null;
+    };
+
+    // Get the tweet URL from the tweet element
+    const getTweetUrl = () => {
+        const tweetLink = tweetElement.querySelector('a[href*="/status/"]');
+        return tweetLink ? `https://twitter.com${tweetLink.getAttribute('href')}` : window.location.href;
     };
 
     return {
@@ -152,12 +185,15 @@ function extractTweetData(tweetElement) {
         views_count: getViews(),
         name: getName(),
         username: getUsername(),
-        tweet_url: window.location.href
+        tweet_url: getTweetUrl(),
+        tweet_date: getDate()
     };
 }
 
+// Commenting out the tweet button functionality
+/*
 function addButtonToTweet(tweetElement) {
-    if (tweetElement.querySelector('.creatorbuddy-button')) return; // Button already added
+    if (tweetElement.querySelector('.creatorbuddy-button')) return;
 
     const actionBar = tweetElement.querySelector('[role="group"]');
     if (!actionBar) return;
@@ -210,7 +246,9 @@ const observer = new MutationObserver((mutations) => {
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
+*/
 
+// Keep the message listener for TWEET_SAVED
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TWEET_SAVED') {
     if (message.success) {

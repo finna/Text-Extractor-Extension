@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
     const authButton = document.getElementById('authButton');
-    const extractButton = document.getElementById('extract-button');
     const saveButton = document.getElementById('save-button');
     const statusMessage = document.getElementById('statusMessage');
     const contentDiv = document.getElementById('content');
@@ -10,8 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkLoginStatus();
 
     authButton.addEventListener('click', handleAuthClick);
-    extractButton.addEventListener('click', extractTweet);
-    saveButton.addEventListener('click', saveTweet);
+    saveButton.addEventListener('click', extractAndSaveTweet);
 
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (request.type === 'loginStateChanged') {
@@ -34,13 +32,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isLoggedIn) {
             statusMessage.textContent = 'Logged in';
             authButton.textContent = 'Logout';
-            extractButton.disabled = false;
+            saveButton.disabled = false;
         } else {
             statusMessage.textContent = 'Not logged in';
             authButton.textContent = 'Login';
-            extractButton.disabled = true;
+            saveButton.disabled = true;
         }
-        saveButton.disabled = true;
     }
 
     function handleAuthClick() {
@@ -66,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function extractTweet() {
+    function extractAndSaveTweet() {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             const tab = tabs[0];
 
@@ -203,28 +200,70 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     console.log('Extraction results:', results);
-
                     const { tweet_text, likes_count, retweet_count, comment_count, bookmark_count, views_count, name, username, tweet_url, tweet_date, error } = results[0].result;
+                    
                     if (error) {
                         contentDiv.innerText = error;
-                        saveButton.disabled = true;
-                    } else {
-                        extractedTweet = { tweet_text, likes_count, retweet_count, comment_count, bookmark_count, views_count, name, username, tweet_url, tweet_date };
-                        const formattedDate = new Date(tweet_date).toLocaleString();
-                        document.getElementById('tweetDate').textContent = `Tweet Date: ${formattedDate}`;
-                        contentDiv.innerHTML = `
-                            <strong>Tweet:</strong> ${tweet_text}<br><br>
-                            <strong>Name:</strong> ${name}<br>
-                            <strong>Username:</strong> ${username}<br>
-                            <strong>URL:</strong> ${tweet_url}<br>
-                            <strong>Likes:</strong> ${likes_count}<br>
-                            <strong>Retweets:</strong> ${retweet_count}<br>
-                            <strong>Comments:</strong> ${comment_count}<br>
-                            <strong>Bookmarks:</strong> ${bookmark_count}<br>
-                            <strong>Views:</strong> ${views_count}
-                        `;
-                        saveButton.disabled = false;
+                        return;
                     }
+
+                    const extractedTweet = { tweet_text, likes_count, retweet_count, comment_count, bookmark_count, views_count, name, username, tweet_url, tweet_date };
+                    
+                    chrome.runtime.sendMessage({type: 'getAuthToken'}, function(response) {
+                        if (!response || !response.token) {
+                            statusMessage.textContent = 'Please log in to save tweets';
+                            return;
+                        }
+
+                        let userId;
+                        try {
+                            const tokenParts = response.token.split('.');
+                            const tokenPayload = JSON.parse(atob(tokenParts[1]));
+                            userId = tokenPayload.sub;
+                        } catch (error) {
+                            console.error('Error parsing JWT token:', error);
+                            contentDiv.innerText = 'Error parsing authentication token';
+                            return;
+                        }
+
+                        const tweetToSave = {
+                            tweet_text: extractedTweet.tweet_text,
+                            likes_count: normalizeCount(extractedTweet.likes_count),
+                            retweet_count: normalizeCount(extractedTweet.retweet_count),
+                            comment_count: normalizeCount(extractedTweet.comment_count),
+                            bookmark_count: normalizeCount(extractedTweet.bookmark_count),
+                            views_count: normalizeCount(extractedTweet.views_count),
+                            name: extractedTweet.name,
+                            username: extractedTweet.username,
+                            tweet_url: extractedTweet.tweet_url,
+                            tweet_date: extractedTweet.tweet_date
+                        };
+
+                        const requestBody = {
+                            tweets: [tweetToSave],
+                            userId: userId
+                        };
+
+                        fetch('http://localhost:3000/api/tweets/save', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${response.token}`
+                            },
+                            body: JSON.stringify(requestBody)
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Tweet saved successfully:', data);
+                            contentDiv.innerText = 'Tweet saved successfully!';
+                            const formattedDate = new Date(tweet_date).toLocaleString();
+                            document.getElementById('tweetDate').textContent = `Tweet Date: ${formattedDate}`;
+                        })
+                        .catch(error => {
+                            console.error('Error saving tweet:', error);
+                            contentDiv.innerText = 'Error saving tweet: ' + error.message;
+                        });
+                    });
                 }
             );
         });
@@ -243,85 +282,5 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             return parseInt(cleanedString, 10) || 0;
         }
-    }
-
-    function saveTweet() {
-        if (!extractedTweet) {
-            contentDiv.innerText = 'No tweet extracted to save.';
-            return;
-        }
-
-        chrome.runtime.sendMessage({type: 'getAuthToken'}, function(response) {
-            if (!response || !response.token) {
-                statusMessage.textContent = 'Please log in to save tweets';
-                return;
-            }
-
-            // Parse the JWT token to get the user ID
-            let userId;
-            try {
-                const tokenParts = response.token.split('.');
-                const tokenPayload = JSON.parse(atob(tokenParts[1]));
-                userId = tokenPayload.sub; // Assuming 'sub' is the user ID in your JWT
-            } catch (error) {
-                console.error('Error parsing JWT token:', error);
-                contentDiv.innerText = 'Error parsing authentication token';
-                return;
-            }
-
-            const tweetToSave = {
-                tweet_text: extractedTweet.tweet_text,
-                likes_count: normalizeCount(extractedTweet.likes_count),
-                retweet_count: normalizeCount(extractedTweet.retweet_count),
-                comment_count: normalizeCount(extractedTweet.comment_count),
-                bookmark_count: normalizeCount(extractedTweet.bookmark_count),
-                views_count: normalizeCount(extractedTweet.views_count),
-                name: extractedTweet.name,
-                username: extractedTweet.username,
-                tweet_url: extractedTweet.tweet_url,
-                tweet_date: extractedTweet.tweet_date
-            };
-
-            console.log('Tweet to save:', tweetToSave);
-
-            const requestBody = {
-                tweets: [tweetToSave],
-                userId: userId
-            };
-
-            console.log('Sending request to save tweet:', requestBody);
-
-            fetch('http://localhost:3000/api/tweets/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${response.token}`
-                },
-                body: JSON.stringify(requestBody)
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.text().then(text => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                    }
-                    try {
-                        return JSON.parse(text);
-                    } catch (error) {
-                        console.error('Error parsing JSON response:', error);
-                        throw new Error('Invalid JSON response from server');
-                    }
-                });
-            })
-            .then(data => {
-                console.log('Tweet saved successfully:', data);
-                contentDiv.innerText = 'Tweet saved successfully!';
-                saveButton.disabled = true;
-            })
-            .catch(error => {
-                console.error('Error saving tweet:', error);
-                contentDiv.innerText = 'Error saving tweet: ' + error.message;
-            });
-        });
     }
 });
