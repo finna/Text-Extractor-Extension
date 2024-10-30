@@ -25,6 +25,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       notifyLoginStateChange();
     });
     return true; // Indicates that the response is sent asynchronously
+  } else if (message.type === 'SAVE_TWEET') {
+    chrome.storage.local.get(['authToken'], function(result) {
+      if (!result.authToken) {
+        console.error('No auth token found');
+        return;
+      }
+
+      const requestBody = {
+        tweets: [message.tweetData],
+        userId: JSON.parse(atob(result.authToken.split('.')[1])).sub
+      };
+
+      fetch('http://localhost:3000/api/tweets/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${result.authToken}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Tweet saved successfully:', data);
+        chrome.tabs.sendMessage(sender.tab.id, { type: 'TWEET_SAVED', success: true });
+      })
+      .catch(error => {
+        console.error('Error saving tweet:', error);
+        chrome.tabs.sendMessage(sender.tab.id, { type: 'TWEET_SAVED', success: false, error: error.message });
+      });
+    });
+    return true; // Indicates that the response is sent asynchronously
   }
 });
 

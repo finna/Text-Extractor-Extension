@@ -1,0 +1,24 @@
+.creatorbuddy-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-left: 4px;
+    border-radius: 50%;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.creatorbuddy-button:hover {
+    background-color: rgba(29, 155, 240, 0.1);
+    transform: scale(1.1);
+}
+
+.creatorbuddy-button svg {
+    fill: rgb(83, 100, 113);
+    transition: fill 0.2s;
+}
+
+.creatorbuddy-button:hover svg {
+    fill: rgb(29, 155, 240);
+}

@@ -4,29 +4,104 @@
   <title>Tweet Extractor</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      width: 300px;
-      padding: 10px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      width: 350px;
+      padding: 20px;
+      background-color: #f7f9fa;
+      color: #1a1a1a;
+      margin: 0;
     }
-    #extract-button, #save-button {
-      margin-top: 10px;
+    h1 {
+      font-size: 24px;
+      color: #1da1f2;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    #statusMessage {
+      background-color: #e8f5fe;
+      border: 1px solid #1da1f2;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 15px;
+      text-align: center;
+      font-weight: bold;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.1s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    #authButton {
+      background-color: #1da1f2;
+      color: white;
+    }
+    #authButton:hover {
+      background-color: #0c85d0;
+    }
+    #extract-button {
+      background-color: #17bf63;
+      color: white;
+    }
+    #extract-button:hover {
+      background-color: #0f9d58;
+    }
+    #save-button {
+      background-color: #794bc4;
+      color: white;
+    }
+    #save-button:hover {
+      background-color: #5f3b9e;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      color: #666666;
+      cursor: not-allowed;
+    }
+    button:disabled:hover {
+      transform: none;
     }
     #content {
-      white-space: pre-wrap;
-      max-height: 400px;
+      background-color: white;
+      border: 1px solid #e1e8ed;
+      border-radius: 5px;
+      padding: 15px;
+      margin-top: 15px;
+      max-height: 300px;
       overflow-y: auto;
-      border: 1px solid #ccc;
-      padding: 5px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #content strong {
+      color: #1da1f2;
+    }
+    #tweetDate {
+      font-size: 14px;
+      color: #657786;
+      text-align: center;
       margin-top: 10px;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
-  <h1>Tweet Extractor</h1>
+  <h1>Creator Buddy</h1>
   <div id="statusMessage"></div>
   <button id="authButton">Login</button>
   <button id="extract-button" disabled>Extract Tweet</button>
   <button id="save-button" disabled>Save Tweet</button>
+  <div id="tweetDate"></div>
   <div id="content"></div>
   <script src="popup.js"></script>
 </body>
