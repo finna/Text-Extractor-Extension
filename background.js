@@ -37,7 +37,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         userId: JSON.parse(atob(result.authToken.split('.')[1])).sub
       };
 
-      fetch('http://localhost:3000/api/tweets/save', {
+      console.log('Saving tweet with token:', result.authToken.substring(0, 20) + '...');
+      console.log('Request body:', requestBody);
+
+      fetch('https://www.creatorbuddy.io/api/tweets/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,14 +48,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         },
         body: JSON.stringify(requestBody)
       })
-      .then(response => response.json())
+      .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', [...response.headers.entries()]);
+        
+        // Check for auth-related headers
+        const authStatus = response.headers.get('x-clerk-auth-status');
+        const authReason = response.headers.get('x-clerk-auth-reason');
+        
+        if (authStatus === 'signed-out' || authReason === 'session-token-outdated') {
+          // Clear the expired token
+          chrome.storage.local.remove('authToken', function() {
+            console.log('Cleared expired auth token');
+          });
+          
+          // Create a new tab for login
+          chrome.tabs.create({ url: 'https://www.creatorbuddy.io/extension-login' });
+          
+          throw new Error('Session expired. Please log in again.');
+        }
+        
+        if (!response.ok) {
+          return response.text().then(text => {
+            console.error('Error response body:', text);
+            throw new Error(`Server returned ${response.status}: ${text.substring(0, 200)}`);
+          });
+        }
+        return response.json();
+      })
       .then(data => {
         console.log('Tweet saved successfully:', data);
-        chrome.tabs.sendMessage(sender.tab.id, { type: 'TWEET_SAVED', success: true });
+        sendResponse({ success: true, data });
       })
       .catch(error => {
         console.error('Error saving tweet:', error);
-        chrome.tabs.sendMessage(sender.tab.id, { type: 'TWEET_SAVED', success: false, error: error.message });
+        sendResponse({ success: false, error: error.message });
       });
     });
     return true; // Indicates that the response is sent asynchronously
@@ -76,7 +106,7 @@ chrome.runtime.onMessageExternal.addListener(
 );
 
 function notifyLoginStateChange() {
-  chrome.tabs.query({url: 'http://localhost:3000/*'}, function(tabs) {
+  chrome.tabs.query({url: 'https://www.creatorbuddy.io/*'}, function(tabs) {
     tabs.forEach(function(tab) {
       chrome.tabs.sendMessage(tab.id, {type: 'loginStateChanged', isLoggedIn: true})
         .catch(error => console.log('Error sending message to tab:', error));

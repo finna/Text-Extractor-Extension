@@ -22,8 +22,26 @@ document.addEventListener('DOMContentLoaded', function() {
             if (chrome.runtime.lastError) {
                 console.error('Error getting auth token:', chrome.runtime.lastError);
                 updateUI(false);
+            } else if (response && response.token) {
+                // Check if token is expired by trying to parse it
+                try {
+                    const payload = JSON.parse(atob(response.token.split('.')[1]));
+                    const isExpired = Date.now() >= payload.exp * 1000;
+                    
+                    if (isExpired) {
+                        console.log('Token is expired, clearing it');
+                        chrome.storage.local.remove('authToken', function() {
+                            updateUI(false);
+                        });
+                    } else {
+                        updateUI(true);
+                    }
+                } catch (error) {
+                    console.error('Error parsing token:', error);
+                    updateUI(false);
+                }
             } else {
-                updateUI(!!response && !!response.token);
+                updateUI(false);
             }
         });
     }
@@ -54,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function login() {
-        chrome.tabs.create({ url: 'http://localhost:3000/extension-login' });
+        chrome.tabs.create({ url: 'https://www.creatorbuddy.io/extension-login' });
     }
 
     function logout() {
@@ -239,29 +257,26 @@ document.addEventListener('DOMContentLoaded', function() {
                             tweet_date: extractedTweet.tweet_date
                         };
 
-                        const requestBody = {
-                            tweets: [tweetToSave],
-                            userId: userId
-                        };
+                        // Send message to background script to save tweet
+                        chrome.runtime.sendMessage({
+                            type: 'SAVE_TWEET',
+                            tweetData: tweetToSave
+                        }, response => {
+                            if (chrome.runtime.lastError) {
+                                console.error('Error saving tweet:', chrome.runtime.lastError);
+                                contentDiv.innerText = 'Error saving tweet: ' + chrome.runtime.lastError.message;
+                                return;
+                            }
 
-                        fetch('http://localhost:3000/api/tweets/save', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${response.token}`
-                            },
-                            body: JSON.stringify(requestBody)
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('Tweet saved successfully:', data);
-                            contentDiv.innerText = 'Tweet saved successfully!';
-                            const formattedDate = new Date(tweet_date).toLocaleString();
-                            document.getElementById('tweetDate').textContent = `Tweet Date: ${formattedDate}`;
-                        })
-                        .catch(error => {
-                            console.error('Error saving tweet:', error);
-                            contentDiv.innerText = 'Error saving tweet: ' + error.message;
+                            if (response.success) {
+                                console.log('Tweet saved successfully:', response.data);
+                                contentDiv.innerText = 'Tweet saved successfully!';
+                                const formattedDate = new Date(extractedTweet.tweet_date).toLocaleString();
+                                document.getElementById('tweetDate').textContent = `Tweet Date: ${formattedDate}`;
+                            } else {
+                                console.error('Error saving tweet:', response.error);
+                                contentDiv.innerText = 'Error saving tweet: ' + response.error;
+                            }
                         });
                     });
                 }
